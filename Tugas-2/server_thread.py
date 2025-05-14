@@ -5,7 +5,7 @@ import logging
 from datetime import datetime
 
 def request_process(request):
-	response = "Unrecognized command"
+	response = "Unrecognized command\n"
 	if request.startswith("TIME") and request.endswith("\n"):
 		now = datetime.now()
 		waktu = now.strftime("%d %m %Y %H:%M:%S")
