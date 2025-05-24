@@ -6,11 +6,11 @@ from datetime import datetime
 
 def request_process(request):
 	response = "Unrecognized command\n"
-	if request.startswith("TIME") and request.endswith("\n"):
+	if request.startswith("TIME") and request.endswith("\r\n"):
 		now = datetime.now()
 		waktu = now.strftime("%d %m %Y %H:%M:%S")
 		response = f"JAM {waktu}\r\n"
-	elif request.startswith("QUIT") and request.endswith("\n"):
+	elif request.startswith("QUIT") and request.endswith("\r\n"):
 		response = "quit"
 	return response
 
