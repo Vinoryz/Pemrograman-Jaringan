@@ -2,6 +2,8 @@ import socket
 import json
 import base64
 import logging
+from time import sleep
+
 
 def send_command(command_str=""):
     global server_address
@@ -71,6 +73,7 @@ def remote_upload(filename=""):
 
     command_str=f"UPLOAD {filename} {file_content}"
     hasil = send_command(command_str)
+    sleep(2)
 
     if (hasil['status']=='OK'):
         print("File berhasil diupload")
@@ -91,7 +94,10 @@ def remote_delete(filename=""):
 
 if __name__=='__main__':
     server_address=('172.16.16.101',46666)
+    # for i in range(1, 1000):
+    #     remote_list()
     remote_list()
     # remote_get('donal.jpg')
-    # remote_upload('pokijan.jpg')
+    # remote_upload('dummy_10MB.bin')
+    remote_upload("pokijan.jpg")
     # remote_delete("pokijan.jpg")
