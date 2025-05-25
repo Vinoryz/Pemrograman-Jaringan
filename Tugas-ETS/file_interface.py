@@ -43,14 +43,14 @@ class FileInterface:
         except Exception as e:
             return dict(status='ERROR', data=str(e))
 
-    # def delete(self, params=[]):
-    #     try:
-    #         filename = params[0]
-    #         os.remove(filename)
-    #         print(f"Successfully deleted {filename}")
-    #         return dict(status='OK', data=f"Successfully deleted {filename}")
-    #     except Exception as e:
-    #         return dict(status='ERROR', data=str(e))
+    def delete(self, params=[]):
+        try:
+            filename = params[0]
+            os.remove(filename)
+            print(f"Successfully deleted {filename}")
+            return dict(status='OK', data=f"Successfully deleted {filename}")
+        except Exception as e:
+            return dict(status='ERROR', data=str(e))
 
 if __name__=='__main__':
     f = FileInterface()
