@@ -79,15 +79,15 @@ def remote_upload(filename=""):
         print("Gagal")
         return False
 
-# def remote_delete(filename=""):
-#     command_str=f"DELETE {filename}"
-#     hasil = send_command(command_str)
-#     if (hasil['status']=='OK'):
-#         print("File telah terhapus")
-#         return True
-#     else:
-#         print("Gagal")
-#         return False
+def remote_delete(filename=""):
+    command_str=f"DELETE {filename}"
+    hasil = send_command(command_str)
+    if (hasil['status']=='OK'):
+        print("File telah terhapus")
+        return True
+    else:
+        print("Gagal")
+        return False
 
 if __name__=='__main__':
     server_address=('172.16.16.101',46666)
