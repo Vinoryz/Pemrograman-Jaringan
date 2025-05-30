@@ -20,7 +20,7 @@ class FileInterface:
     def get(self,params=[]):
         try:
             filename = params[0]
-            if (filename == ''):
+            if filename == '':
                 return None
             fp = open(f"{filename}",'rb')
             isifile = base64.b64encode(fp.read()).decode()
@@ -39,6 +39,7 @@ class FileInterface:
             fp = open(filename,'wb+')
             fp.write(file_content)
             print(f"Successfully uploaded {filename}")
+            # os.remove(filename)
             return dict(status='OK', data=f"Uploaded {filename}")
         except Exception as e:
             return dict(status='ERROR', data=str(e))
@@ -56,5 +57,5 @@ if __name__=='__main__':
     f = FileInterface()
     print(f.list())
     # print(f.get(['pokijan.jpg']))
-    print(f.upload(["test.txt", "SGVsbG8sIHdvcmxkIQ=="]))
-    print(f.list())
+    # print(f.upload(["test.txt", "SGVsbG8sIHdvcmxkIQ=="]))
+    # print(f.list())

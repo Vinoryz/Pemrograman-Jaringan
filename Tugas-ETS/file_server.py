@@ -1,121 +1,134 @@
 from socket import *
 import socket
+import threading
 import logging
 import json
-import time
 import sys
-from concurrent.futures import ProcessPoolExecutor
+from time import sleep
+from concurrent.futures import ProcessPoolExecutor, TimeoutError
 from file_protocol import FileProtocol
-import threading
-import signal
 
-MAX_DATA = 10485760 * 100
 fp = FileProtocol()
 
-# Logging konfigurasi
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler("server.log"),
-        logging.StreamHandler()
-    ]
-)
-
-# Counter thread-safe
-total_requests = 0
-success_count = 0
-fail_count = 0
+# Global counters
+successful_requests = 0
+failed_requests = 0
 counter_lock = threading.Lock()
 
-def handle_client_request(data):
-    try:
-        d = data.decode()
-        hasil = fp.proses_string(d)
-        hasil = hasil + "\r\n\r\n"
-        return hasil.encode()
-    except Exception as e:
-        raise Exception(f"Gagal memproses request: {e}")
 
-class Server:
-    def __init__(self, ipaddress, port, max_workers):
-        self.ipinfo = (ipaddress, port)
-        self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.executor = ProcessPoolExecutor(max_workers=max_workers)
+# Function to process request in subprocess
+def handle_request(data_bytes):
+    try:
+        print("Inside handle_request")
+        d = data_bytes.decode()
+        hasil_handle = fp.proses_string(d)
+    except Exception as e:
+        hasil_handle = json.dumps(dict(status="ERROR", data=str(e)))
+    return hasil_handle + "\r\n\r\n"
+
+
+
+class ProcessTheClient(threading.Thread):
+    def __init__(self, connection, address, pool):
+        super().__init__()
+        self.connection = connection
+        self.address = address
+        self.pool = pool
         self.running = True
 
-    def on_worker_done(self, future, conn, client_address):
-        global success_count, fail_count
+    def run(self):
+        global successful_requests, failed_requests
         try:
-            result = future.result()
-            conn.sendall(result)
-            with counter_lock:
-                success_count += 1
-            logging.info(f"✅ Worker sukses dari {client_address}")
-        except Exception as e:
-            error_msg = json.dumps(dict(status="ERROR", data=str(e))).encode()
-            try:
-                conn.sendall(error_msg)
-            except:
-                logging.warning("Tidak bisa mengirim pesan error ke client (mungkin sudah tertutup)")
-            with counter_lock:
-                fail_count += 1
-            logging.error(f"❌ Worker gagal dari {client_address} - {e}")
+            buffer = b""
+            while self.running:
+                data = self.connection.recv(300000000)
+                if not data:
+                    break
+
+                buffer += data
+                # print(f"{buffer}\n")
+                # sleep(5)
+
+                # Only proceed if the buffer has a full message (ends with our delimiter)
+                if b"\r\n\r\n" not in buffer:
+                    continue
+
+                # We extract up to the delimiter
+                full_data, _, remainder = buffer.partition(b"\r\n\r\n")
+                buffer = remainder  # Save any trailing data for next round
+
+                try:
+                    future = self.pool.submit(handle_request, full_data)
+                    print(future.result())
+                    hasil = future.result(timeout=10)
+                    self.connection.sendall(hasil.encode())
+
+                    with counter_lock:
+                        successful_requests += 1
+                except TimeoutError:
+                    self.connection.sendall(b'{"status": "ERROR", "data": "Processing timeout"}\r\n\r\n')
+                    with counter_lock:
+                        failed_requests += 1
+                except Exception as e:
+                    self.connection.sendall(b'{"status": "ERROR", "data": "Unhandled error"}\r\n\r\n')
+                    with counter_lock:
+                        failed_requests += 1
+
         finally:
-            conn.close()
+            self.connection.close()
+
+class Server(threading.Thread):
+    def __init__(self, ipaddress, port, pool):
+        super().__init__()
+        self.ipinfo = (ipaddress, port)
+        self.pool = pool
+        self.the_clients = []
+        self.my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.running = True
 
     def run(self):
-        global total_requests
-        logging.info(f"🚀 Server berjalan di {self.ipinfo[0]}:{self.ipinfo[1]}")
+        logging.warning(f"Server running at {self.ipinfo}")
         self.my_socket.bind(self.ipinfo)
         self.my_socket.listen(5)
+        try:
+            while self.running:
+                conn, addr = self.my_socket.accept()
+                logging.warning(f"Connection from {addr}")
+                clt = ProcessTheClient(conn, addr, self.pool)
+                clt.start()
+                self.the_clients.append(clt)
+        except Exception as e:
+            logging.warning(f"Server exception: {str(e)}")
+        finally:
+            self.my_socket.close()
 
-        # Tangani sinyal Ctrl+C untuk ringkasan
-        def signal_handler(sig, frame):
-            self.running = False
-            logging.info("✋ Server dihentikan oleh user (Ctrl+C)")
-            self.show_summary()
-            sys.exit(0)
-
-        signal.signal(signal.SIGINT, signal_handler)
-
-        while self.running:
-            try:
-                connection, client_address = self.my_socket.accept()
-                logging.info(f"🔌 Koneksi dari {client_address}")
-                data = connection.recv(MAX_DATA)
-                if data:
-                    with counter_lock:
-                        total_requests += 1
-                    future = self.executor.submit(handle_client_request, data)
-                    future.add_done_callback(
-                        lambda fut, conn=connection, addr=client_address: self.on_worker_done(fut, conn, addr)
-                    )
-                else:
-                    connection.close()
-            except Exception as e:
-                logging.error(f"⚠️ Kesalahan di loop utama: {e}")
-
-    def show_summary(self):
-        logging.info("\n===== 📊 RINGKASAN SERVER 📊 =====")
-        logging.info(f"Total request diterima : {total_requests}")
-        logging.info(f"Worker berhasil         : {success_count}")
-        logging.info(f"Worker gagal            : {fail_count}")
-        logging.info("===================================")
+    def stop(self):
+        self.running = False
+        self.my_socket.close()
+        for c in self.the_clients:
+            c.running = False
+            c.join()
 
 
 def main():
-    max_workers = 1
-    if len(sys.argv) > 1:
-        try:
-            max_workers = int(sys.argv[1])
-        except:
-            print("Gunakan: python file_server.py [jumlah_worker]")
-            sys.exit(1)
+    global successful_requests, failed_requests
 
-    svr = Server(ipaddress='0.0.0.0', port=46666, max_workers=max_workers)
-    svr.run()
+    pool = ProcessPoolExecutor(max_workers=10)
+    server = Server(ipaddress='0.0.0.0', port=46666, pool=pool)
+
+    try:
+        server.start()
+        server.join()
+    except KeyboardInterrupt:
+        logging.warning("KeyboardInterrupt received. Shutting down server.")
+        server.stop()
+        pool.shutdown(wait=True)
+
+        with counter_lock:
+            print(f"\nTotal Success: {successful_requests}")
+            print(f"Total Failed : {failed_requests}")
+
 
 if __name__ == "__main__":
     main()
