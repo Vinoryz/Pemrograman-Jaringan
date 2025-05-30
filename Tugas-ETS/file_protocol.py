@@ -30,7 +30,6 @@ class FileProtocol:
             params = [x for x in c[1:]]
 
             cl = getattr(self.file,c_request)(params)
-            print(f"cl kelar bre")
             return json.dumps(cl)
         except Exception:
             return json.dumps(dict(status='ERROR',data='request tidak dikenali'))

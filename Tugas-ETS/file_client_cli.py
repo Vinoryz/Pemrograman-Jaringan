@@ -3,7 +3,8 @@ import json
 import base64
 import logging
 import os
-from time import sleep
+import time
+import threading
 
 def send_command(command_str=""):
     global server_address
@@ -18,7 +19,7 @@ def send_command(command_str=""):
 
         data_received = ""  # empty string
         while True:
-            data = sock.recv(65536)
+            data = sock.recv(20000000)
             if data:
                 data_received += data.decode()
                 if "\r\n\r\n" in data_received:
@@ -50,16 +51,14 @@ def remote_list():
         print("Gagal")
         return False
 
-def remote_get(filename=""):
+def remote_get(filename="", index=0):
     command_str=f"GET {filename}"
     hasil = send_command(command_str)
     if (hasil['status']=='OK'):
-        #proses file dalam bentuk base64 ke bentuk bytes
-        namafile= hasil['data_namafile']
+        namafile= f"{index}_{hasil['data_namafile']}"  # ➕ Nama unik
         isifile = base64.b64decode(hasil['data_file'])
-        fp = open(namafile,'wb+')
-        fp.write(isifile)
-        fp.close()
+        with open(namafile, 'wb') as fp:
+            fp.write(isifile)
         os.remove(namafile)
         return True
     else:
@@ -96,9 +95,21 @@ def remote_delete(filename=""):
 
 if __name__=='__main__':
     server_address=('172.16.16.101',46666)
+    start_time = time.time()
     # send_command("LIST")
-    # remote_list()
+    remote_list()
     # remote_delete('dummy_10MB.bin')
-    remote_get('dummy_10MB.bin')
+
+    threads = []
+
+    for i in range(1):
+        t = threading.Thread(target=remote_get, args=('dummy_50MB.bin', i))
+        t.start()
+        threads.append(t)
+
+    for t in threads:
+        t.join()
     # remote_upload('dummy_10MB.bin')
     # remote_delete("pokijan.jpg")
+    end_time = time.time()
+    print(f"\nSemua thread selesai. Total waktu eksekusi: {end_time - start_time:.2f} detik")

@@ -19,7 +19,6 @@ counter_lock = threading.Lock()
 # Function to process request in subprocess
 def handle_request(data_bytes):
     try:
-        print("Inside handle_request")
         d = data_bytes.decode()
         hasil_handle = fp.proses_string(d)
     except Exception as e:
@@ -41,7 +40,7 @@ class ProcessTheClient(threading.Thread):
         try:
             buffer = b""
             while self.running:
-                data = self.connection.recv(300000000)
+                data = self.connection.recv(4096)
                 if not data:
                     break
 
@@ -59,8 +58,7 @@ class ProcessTheClient(threading.Thread):
 
                 try:
                     future = self.pool.submit(handle_request, full_data)
-                    print(future.result())
-                    hasil = future.result(timeout=10)
+                    hasil = future.result(timeout=100)
                     self.connection.sendall(hasil.encode())
 
                     with counter_lock:
@@ -114,7 +112,7 @@ class Server(threading.Thread):
 def main():
     global successful_requests, failed_requests
 
-    pool = ProcessPoolExecutor(max_workers=10)
+    pool = ProcessPoolExecutor(max_workers=5)
     server = Server(ipaddress='0.0.0.0', port=46666, pool=pool)
 
     try:
