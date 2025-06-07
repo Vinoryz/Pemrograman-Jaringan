@@ -10,12 +10,16 @@ def send_command(command_str=""):
     logging.warning(f"connecting to {server_address}")
     try:
         logging.warning(f"sending message ")
+        # ---- MODIFICATION START ----
+        # Append the delimiter to the command string
+        command_str += "\r\n\r\n"
+        # ---- MODIFICATION END ----
         sock.sendall(command_str.encode())
         # Look for the response, waiting until socket is done (no more data)
         data_received="" #empty string
         while True:
             #socket does not receive all data at once, data comes in part, need to be concatenated at the end of process
-            data = sock.recv(16)
+            data = sock.recv(10240000)
             if data:
                 #data is not empty, concat with previous content
                 data_received += data.decode()
@@ -53,9 +57,9 @@ def remote_get(filename=""):
         #proses file dalam bentuk base64 ke bentuk bytes
         namafile= hasil['data_namafile']
         isifile = base64.b64decode(hasil['data_file'])
-        fp = open(namafile,'wb+')
-        fp.write(isifile)
-        fp.close()
+        with open(namafile, 'wb+') as fp:
+            fp.write(isifile)
+            fp.close()
         return True
     else:
         print("Gagal")
@@ -63,13 +67,14 @@ def remote_get(filename=""):
 
 def remote_upload(filename=""):
     try:
-        f = open(filename,'rb')
+        f = open(filename,'rb+')
         contents = f.read()
         file_content = base64.b64encode(contents).decode()
     except:
         return None
 
     command_str=f"UPLOAD {filename} {file_content}"
+    # print(command_str)
     hasil = send_command(command_str)
 
     if (hasil['status']=='OK'):
@@ -91,9 +96,13 @@ def remote_delete(filename=""):
 
 if __name__=='__main__':
     server_address=('172.16.16.101',46666)
-    remote_list()
-    # remote_get('donal.jpg')
-    # remote_upload('donalbebek.jpg')
-    remote_delete("donalbebek.jpg")
+    # remote_list()
+    # remote_upload("donalbebek.jpg")
+    # remote_upload("pokijan.jpg")
+    remote_upload("rfc2616.pdf")
+    # remote_get("donalbebek.jpg")
+    # remote_get("rfc2616.pdf")
+    # remote_get("pokijan.jpg")
+    # remote_delete("donalbebek.jpg")
     remote_delete("rfc2616.pdf")
-    remote_delete("pokijan.jpg")
+    # remote_delete("pokijan.jpg")

@@ -20,7 +20,7 @@ class FileInterface:
     def get(self,params=[]):
         try:
             filename = params[0]
-            if (filename == ''):
+            if filename == '':
                 return None
             fp = open(f"{filename}",'rb')
             isifile = base64.b64encode(fp.read()).decode()
@@ -30,6 +30,8 @@ class FileInterface:
 
     def upload(self, params=[]):
         if len(params) != 2:
+            print(len(params))
+            print("masuk interface")
             return dict(status='ERROR',data="This command need 2 parameters")
 
         try:
@@ -38,6 +40,7 @@ class FileInterface:
             file_content = base64.b64decode(file_content.encode())
             fp = open(filename,'wb+')
             fp.write(file_content)
+            # print("keluar interface")
             print(f"Successfully uploaded {filename}")
             return dict(status='OK', data=f"Uploaded {filename}")
         except Exception as e:
@@ -56,5 +59,4 @@ if __name__=='__main__':
     f = FileInterface()
     print(f.list())
     # print(f.get(['pokijan.jpg']))
-    print(f.upload(["test.txt", "SGVsbG8sIHdvcmxkIQ=="]))
-    print(f.list())
+    print(f.get(['rfc2616.pdf']))

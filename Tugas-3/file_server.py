@@ -5,6 +5,7 @@ import logging
 import json
 import time
 import sys
+from time import sleep
 
 
 from file_protocol import  FileProtocol
@@ -18,17 +19,29 @@ class ProcessTheClient(threading.Thread):
         threading.Thread.__init__(self)
 
     def run(self):
+        data_received = b""
+        # it = 1
         while True:
-            data = self.connection.recv(10485760)
+            # Receive data in chunks
+            data = self.connection.recv(1024000)
+            # print(it)
+            # it += 1
             if data:
-                d = data.decode()
-                hasil = fp.proses_string(d)
-                hasil=hasil+"\r\n\r\n"
-                self.connection.sendall(hasil.encode())
+                data_received += data
+                # Check if the end-of-message delimiter is in the buffer
+                if b"\r\n\r\n" in data_received:
+                    # Decode the complete message and remove the delimiter
+                    d = data_received.decode().strip()
+                    # Process the complete string
+                    hasil = fp.proses_string(d)
+                    hasil = hasil + "\r\n\r\n"
+                    self.connection.sendall(hasil.encode())
+                    # Reset buffer for the next command
+                    data_received = b""
             else:
+                # If no data is received, the client has closed the connection
                 break
         self.connection.close()
-
 
 class Server(threading.Thread):
     def __init__(self,ipaddress,port):
