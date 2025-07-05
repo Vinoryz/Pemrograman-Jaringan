@@ -38,7 +38,7 @@ class HttpServer:
 		return response
 
 	def proses(self,data):
-
+		
 		requests = data.split("\r\n")
 		#print(requests)
 
@@ -60,58 +60,39 @@ class HttpServer:
 				return self.response(400,'Bad Request','',{})
 		except IndexError:
 			return self.response(400,'Bad Request','',{})
-
-	def http_get(self, object_address, headers):
+	def http_get(self,object_address,headers):
 		files = glob('./*')
-
-		thedir = './'
+		#print(files)
+		thedir='./'
 		if (object_address == '/'):
-			return self.response(200, 'OK', 'Ini Adalah web Server percobaan', dict())
+			return self.response(200,'OK','Ini Adalah web Server percobaan',dict())
+
 		if (object_address == '/video'):
-			return self.response(302, 'Found', '', dict(location='https://youtu.be/katoxpnTf04'))
+			return self.response(302,'Found','',dict(location='https://youtu.be/katoxpnTf04'))
 		if (object_address == '/santai'):
-			return self.response(200, 'OK', 'santai saja', dict())
-		if object_address == '/list':
-			files = os.listdir('./')
-			files = [f for f in files if os.path.isfile(f)]
-			isi = '\n'.join(files)
-			return self.response(200, 'OK', isi, {'Content-type': 'text/plain'})
+			return self.response(200,'OK','santai saja',dict())
 
-		object_address = object_address[1:]
-		if thedir + object_address not in files:
-			return self.response(404, 'Not Found', '', {})
-		fp = open(thedir + object_address, 'rb')
 
+		object_address=object_address[1:]
+		if thedir+object_address not in files:
+			return self.response(404,'Not Found','',{})
+		fp = open(thedir+object_address,'rb') #rb => artinya adalah read dalam bentuk binary
+		#harus membaca dalam bentuk byte dan BINARY
 		isi = fp.read()
-
-		fext = os.path.splitext(thedir + object_address)[1]
+		
+		fext = os.path.splitext(thedir+object_address)[1]
 		content_type = self.types[fext]
-
-		headers = {}
-		headers['Content-type'] = content_type
-
-		return self.response(200, 'OK', isi, headers)
-
-	def http_post(self, object_address, headers, body):
-		filename = object_address.lstrip('/')
-		try:
-			with open(filename, 'wb') as f:
-				f.write(body.encode())
-			return self.response(200, 'OK', f'File {filename} berhasil diupload', {'Content-type': 'text/plain'})
-		except Exception as e:
-			return self.response(500, 'Internal Server Error', str(e), {})
-
-	def http_delete(self, object_address, headers):
-		filename = object_address.lstrip('/')
-		if not os.path.exists(filename):
-			return self.response(404, 'Not Found', f'File {filename} tidak ditemukan', {})
-		try:
-			os.remove(filename)
-			return self.response(200, 'OK', f'File {filename} berhasil dihapus', {'Content-type': 'text/plain'})
-		except Exception as e:
-			return self.response(500, 'Internal Server Error', str(e), {})
-
-
+		
+		headers={}
+		headers['Content-type']=content_type
+		
+		return self.response(200,'OK',isi,headers)
+	def http_post(self,object_address,headers):
+		headers ={}
+		isi = "kosong"
+		return self.response(200,'OK',isi,headers)
+		
+			 	
 #>>> import os.path
 #>>> ext = os.path.splitext('/ak/52.png')
 
