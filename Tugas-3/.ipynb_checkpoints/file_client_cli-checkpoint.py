@@ -10,8 +10,12 @@ def send_command(command_str=""):
     logging.warning(f"connecting to {server_address}")
     try:
         logging.warning(f"sending message ")
+        # ---- MODIFICATION START ----
+        # Append the delimiter to the command string
         command_str += "\r\n\r\n"
+        # ---- MODIFICATION END ----
         sock.sendall(command_str.encode())
+        # Look for the response, waiting until socket is done (no more data)
         data_received="" #empty string
         while True:
             #socket does not receive all data at once, data comes in part, need to be concatenated at the end of process
