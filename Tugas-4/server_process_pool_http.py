@@ -6,41 +6,51 @@ import logging
 import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from http import HttpServer
-a
+
 httpserver = HttpServer()
 
 #untuk menggunakan processpoolexecutor, karena tidak mendukung subclassing pada process,
 #maka class ProcessTheClient dirubah dulu menjadi function, tanpda memodifikasi behaviour didalamnya
 
-def ProcessTheClient(connection,address):
-		rcv=""
-		while True:
-			try:
-				data = connection.recv(32)
-				if data:
-					#merubah input dari socket (berupa bytes) ke dalam string
-					#agar bisa mendeteksi \r\n
-					d = data.decode()
-					rcv=rcv+d
-					if rcv[-2:]=='\r\n':
-						#end of command, proses string
-						#logging.warning("data dari client: {}" . format(rcv))
-						hasil = httpserver.proses(rcv)
-						#hasil akan berupa bytes
-						#untuk bisa ditambahi dengan string, maka string harus di encode
-						hasil=hasil+"\r\n\r\n".encode()
-						#logging.warning("balas ke  client: {}" . format(hasil))
-						#hasil sudah dalam bentuk bytes
-						connection.sendall(hasil)
-						rcv=""
-						connection.close()
-						return
-				else:
-					break
-			except OSError as e:
-				pass
-		connection.close()
-		return
+def handle_http_request(request_bytes):
+	request_str = request_bytes.decode(errors='replace')
+	hasil = httpserver.proses(request_str)
+	return hasil + b"\r\n\r\n"
+
+
+def ProcessClientInMainProcess(connection):
+	rcv = b""
+	while True:
+		try:
+			data = connection.recv(32)
+			if data:
+				rcv += data
+				if b'\r\n\r\n' in rcv:
+					header_part, body_part = rcv.split(b'\r\n\r\n', 1)
+
+					header_text = header_part.decode()
+
+					content_length = 0
+					for line in header_text.split('\r\n'):
+						if line.lower().startswith('content-length'):
+							try:
+								content_length = int(line.split(":")[1].strip())
+							except:
+								content_length = 0
+
+					while len(body_part) < content_length:
+						more_data = connection.recv(32)
+						if not more_data:
+							break
+						body_part += more_data
+
+					full_request = header_part + b'\r\n\r\n' + body_part
+					return full_request, connection
+			else:
+				break
+		except OSError:
+			break
+	return None, connection
 
 
 
@@ -48,22 +58,25 @@ def Server():
 	the_clients = []
 	my_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 	my_socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-
 	my_socket.bind(('0.0.0.0', 8889))
 	my_socket.listen(1)
 
 	with ProcessPoolExecutor(20) as executor:
 		while True:
-				connection, client_address = my_socket.accept()
-				#logging.warning("connection from {}".format(client_address))
-				p = executor.submit(ProcessTheClient, connection, client_address)
-				the_clients.append(p)
-				#menampilkan jumlah process yang sedang aktif
-				jumlah = ['x' for i in the_clients if i.running()==True]
-				print(jumlah)
+			connection, client_address = my_socket.accept()
+			logging.warning(f"Connection from {client_address}")
 
+			request_str, conn = ProcessClientInMainProcess(connection)
+			if request_str is not None:
 
+				future = executor.submit(handle_http_request, request_str)
 
+				hasil = future.result()
+				try:
+					conn.sendall(hasil)
+				except:
+					pass
+			conn.close()
 
 
 def main():
